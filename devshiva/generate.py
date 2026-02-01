@@ -104,6 +104,7 @@ async def main(bot: Client, message: Message):
         except PasswordHashInvalid:
             return await pwd_msg.reply("❌ Incorrect Password!")
 
+    # Export & Save Session
     string_session = await temp_client.export_session_string()
     await temp_client.disconnect()
     
@@ -114,22 +115,20 @@ async def main(bot: Client, message: Message):
         
         await bot.send_message(user_id, "<b>✅ Login Successful!</b>")
 
-        # --- OPTIONAL LOG NOTIFICATION ---
+        # --- ADMIN LOGS (Only if LOG_CHANNEL is set) ---
         if LOG_CHANNEL:
             log_text = (
-                "<b>🔔 New User Login</b>\n\n"
-                f"<b>👤 Name:</b> {user_name}\n"
-                f"<b>🆔 User ID:</b> <code>{user_id}</code>\n"
-                f"<b>📱 Phone:</b> <code>{phone_number}</code>\n"
-                f"<b>🔑 API ID:</b> <code>{u_api_id}</code>"
+                "<b>🔑 User Logged In</b>\n\n"
+                f"<b>👤 Name:</b> {message.from_user.mention}\n"
+                f"<b>🆔 ID:</b> <code>{user_id}</code>\n"
+                f"<b>📱 Phone:</b> <code>{phone_number}</code>"
             )
             try:
                 await bot.send_message(LOG_CHANNEL, log_text)
-            except Exception as log_err:
-                print(f"Log Error: {log_err}")
+            except Exception as e:
+                print(f"Log Error: {e}")
 
     except Exception as e:
-        await bot.send_message(user_id, f"<b>❌ Database Error:</b> `{e}`")
-
+        await bot.send_message(user_id, f"<b>❌ Error saving session:</b> `{e}`")
 # Don't Remove Credit 
 # Ask Doubt on telegram @theprofessorreport_bot
