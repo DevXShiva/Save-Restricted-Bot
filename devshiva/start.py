@@ -84,7 +84,7 @@ async def send_start(client: Client, message: Message):
     # Check verification status to hide/show button
     is_verified = await db.get_verify_status(user_id)
     
-    welcome_img = "https://i.ibb.co/dJ0gpJf1/photo-2025-06-16-12-07-05-7516517596376596504.jpg" 
+    welcome_img = "logo.png" 
     welcome_text = (
         f"<b>👋 Hi {message.from_user.mention}!</b>\n\n"
         "I am a powerful **Save Restricted Content Bot**.\n\n"
