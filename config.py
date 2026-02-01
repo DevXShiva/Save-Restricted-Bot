@@ -33,6 +33,9 @@ SHORTENER_URL = os.environ.get("SHORTENER_URL", "") # Example site
 SHORTENER_API = os.environ.get("SHORTENER_API", "") # Your Shortener API Key
 VERIFY_EXPIRE = int(os.environ.get("VERIFY_EXPIRE", "21600")) # Default 6 Hours (in seconds)
 
+# --- LOG CHANNEL ---
+LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "")
+
 # --- Other Settings ---
 # Target Channel for files (Leave empty if not needed)
 CHANNEL_ID = os.environ.get("CHANNEL_ID", "")
