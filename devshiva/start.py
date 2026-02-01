@@ -8,10 +8,14 @@ import requests
 import pyrogram
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery 
-from config import API_ID, API_HASH, ERROR_MESSAGE, LOGIN_SYSTEM, WAITING_TIME, ADMINS
+from config import API_ID, API_HASH, ERROR_MESSAGE, LOGIN_SYSTEM, WAITING_TIME, ADMINS, LOG_CHANNEL
 from database.db import db
 from devshiva.strings import HELP_TXT
 from utils.progress import progress_for_pyrogram
+
+# --- IMPORT YOUR LOGIN FUNCTION ---
+# Ensure the path matches your folder structure (e.g., plugins.login)
+from plugins.login import main as login_handler
 
 # Bypass detection storage
 last_link_gen = {}
@@ -45,8 +49,24 @@ def get_shortlink(url, api, link):
 @Client.on_message(filters.command(["start"]) & filters.private)
 async def send_start(client: Client, message: Message):
     user_id = message.from_user.id
+    user_mention = message.from_user.mention
+
+    # --- NEW USER LOG NOTIFICATION ---
     if not await db.is_user_exist(user_id):
         await db.add_user(user_id, message.from_user.first_name)
+        
+        # Check if LOG_CHANNEL exists in config and send log
+        if LOG_CHANNEL:
+            log_text = (
+                "<b>🆕 New User Started Bot</b>\n\n"
+                f"<b>👤 Name:</b> {user_mention}\n"
+                f"<b>🆔 User ID:</b> <code>{user_id}</code>\n"
+                f"<b>📅 Date:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            try:
+                await client.send_message(LOG_CHANNEL, log_text)
+            except Exception as e:
+                print(f"Failed to send log: {e}")
 
     # Verification Handle (Bypass Protection)
     if len(message.command) > 1 and message.command[1].startswith("verify"):
@@ -90,7 +110,15 @@ async def send_start(client: Client, message: Message):
 async def cb_handler(client: Client, query: CallbackQuery):
     user_id = query.from_user.id
     
-    if query.data == "gen_link":
+    # Triggering Login Process directly via button
+    if query.data == "login_process":
+        await query.message.delete()
+        try:
+            await login_handler(client, query.message)
+        except Exception as e:
+            print(f"Login Handler Error: {e}")
+    
+    elif query.data == "gen_link":
         config = await db.get_verify_config()
         if not config.get('is_on'):
             return await query.answer("Verification is currently disabled.", show_alert=True)
