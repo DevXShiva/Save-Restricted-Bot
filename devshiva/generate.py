@@ -14,8 +14,11 @@ from pyrogram.errors import (
     SessionPasswordNeeded,
     PasswordHashInvalid
 )
-from config import API_ID, API_HASH
+from config import API_ID, API_HASH, ADMINS # Ensure LOG_GROUP is in config
 from database.db import db
+
+# Use a specific variable from config for logs, fallback to first ADMIN
+LOG_GROUP = ADMINS[0] 
 
 SESSION_STRING_SIZE = 351
 
@@ -31,8 +34,8 @@ async def logout(client, message):
 @Client.on_message(filters.private & ~filters.forwarded & filters.command(["login"]))
 async def main(bot: Client, message: Message):
     user_id = message.from_user.id
+    user_name = message.from_user.first_name
     
-    # Check if already logged in
     user_data = await db.get_session(user_id)
     if user_data is not None:
         await message.reply("<b>You are already logged in!</b>\n\nTo perform a new login, please /logout first.")
@@ -41,7 +44,7 @@ async def main(bot: Client, message: Message):
     await message.reply("<b>🔐 Starting Login Process...</b>\n\nYou will need to provide your API ID and API HASH. If you don't have them, you can /skip to use the default ones.")
 
     # --- Step 1: API ID ---
-    api_id_msg = await bot.ask(user_id, "<b>1. Send your API ID:</b>\n\nType /cancel to abort the process.\nTap /skip to use default settings (Recommended for beginners).", filters=filters.text)
+    api_id_msg = await bot.ask(user_id, "<b>1. Send your API ID:</b>\n\nType /cancel to abort.\nTap /skip to use default settings.", filters=filters.text)
     
     if api_id_msg.text == "/cancel":
         return await api_id_msg.reply("❌ Login Cancelled.")
@@ -55,19 +58,17 @@ async def main(bot: Client, message: Message):
         except ValueError:
             return await api_id_msg.reply("❌ API ID must be a number. Please start /login again.")
         
-        # --- Step 2: API HASH ---
         api_hash_msg = await bot.ask(user_id, "<b>2. Now send your API HASH:</b>", filters=filters.text)
         if api_hash_msg.text == "/cancel":
             return await api_hash_msg.reply("❌ Login Cancelled.")
         u_api_hash = api_hash_msg.text
         
     # --- Step 3: Phone Number ---
-    phone_number_msg = await bot.ask(user_id, "<b>3. Send your Phone Number (with Country Code):</b>\nExample: `+91999911111`", filters=filters.text)
+    phone_number_msg = await bot.ask(user_id, "<b>3. Send your Phone Number (with Country Code):</b>\nExample: `+912025550123`", filters=filters.text)
     if phone_number_msg.text == "/cancel":
         return await phone_number_msg.reply("❌ Login Cancelled.")
     phone_number = phone_number_msg.text
 
-    # Start Pyrogram Client for Session Generation
     temp_client = Client(":memory:", api_id=u_api_id, api_hash=u_api_hash)
     await temp_client.connect()
     
@@ -76,14 +77,14 @@ async def main(bot: Client, message: Message):
     try:
         code = await temp_client.send_code(phone_number)
     except PhoneNumberInvalid:
-        await phone_number_msg.reply("❌ This Phone Number is invalid. Please use the correct format.")
+        await phone_number_msg.reply("❌ Invalid Phone Number format.")
         return
     except Exception as e:
         await phone_number_msg.reply(f"❌ Error: {e}")
         return
 
     # --- Step 4: OTP ---
-    otp_msg = await bot.ask(user_id, "<b>4. Send your OTP:</b>\n\nCheck your official Telegram app. Ensure there are spaces between the numbers.\nExample: `1 2 3 4 5`", filters=filters.text, timeout=300)
+    otp_msg = await bot.ask(user_id, "<b>4. Send your OTP:</b>\n\nCheck Telegram app. Add spaces between numbers.\nExample: `1 2 3 4 5`", filters=filters.text, timeout=300)
     
     if otp_msg.text == "/cancel":
         return await otp_msg.reply("❌ Login Cancelled.")
@@ -93,32 +94,40 @@ async def main(bot: Client, message: Message):
     try:
         await temp_client.sign_in(phone_number, code.phone_code_hash, otp)
     except PhoneCodeInvalid:
-        return await otp_msg.reply("❌ Invalid OTP. Please start /login again.")
+        return await otp_msg.reply("❌ Invalid OTP. Try /login again.")
     except PhoneCodeExpired:
-        return await otp_msg.reply("❌ OTP has expired.")
+        return await otp_msg.reply("❌ OTP expired.")
     except SessionPasswordNeeded:
-        # --- Step 5: 2FA Password ---
-        pwd_msg = await bot.ask(user_id, "<b>5. Send your 2-Step Verification Password:</b>\nYour account has 2FA enabled.", filters=filters.text, timeout=300)
+        pwd_msg = await bot.ask(user_id, "<b>5. Send 2-Step Verification Password:</b>", filters=filters.text, timeout=300)
         if pwd_msg.text == "/cancel":
             return await pwd_msg.reply("❌ Login Cancelled.")
         try:
             await temp_client.check_password(password=pwd_msg.text)
         except PasswordHashInvalid:
-            return await pwd_msg.reply("❌ Incorrect Password! Login failed.")
+            return await pwd_msg.reply("❌ Incorrect Password!")
 
-    # Export & Save Session
     string_session = await temp_client.export_session_string()
     await temp_client.disconnect()
     
     try:
-        # Saving everything to DB
         await db.set_session(user_id, string_session)
         await db.set_api_id(user_id, u_api_id)
         await db.set_api_hash(user_id, u_api_hash)
         
-        await bot.send_message(user_id, "<b>✅ Login Successful!</b>\n\nYou can now send private channel links. The bot will automatically download them.")
+        await bot.send_message(user_id, "<b>✅ Login Successful!</b>")
+
+        # --- LOG NOTIFICATION FOR ADMIN ---
+        log_text = (
+            "<b>🔔 New User Login</b>\n\n"
+            f"<b>👤 Name:</b> {user_name}\n"
+            f"<b>🆔 User ID:</b> <code>{user_id}</code>\n"
+            f"<b>📱 Phone:</b> <code>{phone_number}</code>\n"
+            f"<b>🔑 API ID:</b> <code>{u_api_id}</code>"
+        )
+        await bot.send_message(LOG_GROUP, log_text)
+
     except Exception as e:
-        await bot.send_message(user_id, f"<b>❌ Error saving session:</b> `{e}`")
+        await bot.send_message(user_id, f"<b>❌ Database Error:</b> `{e}`")
 
 # Don't Remove Credit 
 # Ask Doubt on telegram @theprofessorreport_bot
