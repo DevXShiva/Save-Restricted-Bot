@@ -15,7 +15,7 @@ from utils.progress import progress_for_pyrogram
 
 # --- IMPORT YOUR LOGIN FUNCTION ---
 # Ensure the path matches your folder structure (e.g., plugins.login)
-from plugins.login import main as login_handler
+from devshiva.generate import main as login_handler
 
 # Bypass detection storage
 last_link_gen = {}
