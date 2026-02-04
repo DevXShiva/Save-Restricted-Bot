@@ -38,6 +38,7 @@ class Database:
         return await self.col.count_documents({})
 
     async def get_all_users(self):
+        # Broadcast loop ke liye cursor return karna better hota hai
         return self.col.find({})
 
     async def delete_user(self, user_id):
@@ -114,6 +115,7 @@ class Database:
         if not config:
             return {"is_on": False, "url": None, "api": None}
         return config
+
 db = Database(DB_URI, DB_NAME)
 
 # Don't Remove Credit 
