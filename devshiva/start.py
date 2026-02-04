@@ -116,7 +116,7 @@ async def broadcast_handler(client, message):
     success, failed = 0, 0
     for user in users:
         try:
-            await message.reply_to_message.copy(user['user_id'])
+            await message.reply_to_message.copy(user['id'])
             success += 1
         except: failed += 1
     await b_msg.edit(f"<b>✅ Broadcast Completed!</b>\n\nSent: {success}\nFailed: {failed}")
